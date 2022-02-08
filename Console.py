@@ -10,7 +10,10 @@ import os
 import typing
 import pandas as pd
 import numpy as np
-from Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats)
+
+from Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, get_schedule)
+from Predictors.Predictors import Offense_Correlation
+from Predictors.Analyzer import analyze_predicter
 
 def explore(obj):
     if type(obj) is dict:
@@ -41,16 +44,42 @@ def explore_dict(dictionary):
 
 
 def main():
-    # data = get_teams_stats('clt',2021)
-    # print(data.corr())
+    pd.set_option('display.max_columns', None)
+    
+    # explore(get_schedule(2021))
+    
+    # return
+    predicters = []
+    for year in [2020,2021]:
+        predicters.append(Offense_Correlation(year))
+
+    for predicter in predicters:
+        analyze_predicter(predicter)
+
+    # print(predictor.predict_winner("Arizona Cardinals", "Atlanta Falcons"))
+    return
+    
+    
+    
     
     data = get_all_teams_stats(2021)
     all_offenses = {key:value for key,value in data[2021].items()}
-    vertical_stack = pd.concat([x.head(1) for key, x in all_offenses.items()], axis=0)
+    vertical_stack = pd.concat({key: x.head(1) for key, x in all_offenses.items()}, axis=0)
+    vertical_stack = vertical_stack.reset_index(level=1, drop=True)
+    cols = ['PF', 'Yds']
+    offense_normal = (vertical_stack-vertical_stack.min())/(vertical_stack.max()-vertical_stack.min())
     correlation = vertical_stack.corr()
-    print(correlation[0:3])
+    win_corr = correlation.iloc[0,3:]
     
-    # explore(data)
+    for key in win_corr.index:
+        print(key)
+        
+    for team in offense_normal.index:
+        total = 0
+        for key in win_corr.index:
+            total += win_corr[key] * offense_normal.loc[team, key]
+        print(f'{team} - {total}')
+
 
 if __name__ == "__main__":
     main()

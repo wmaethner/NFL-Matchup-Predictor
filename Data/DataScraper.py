@@ -46,23 +46,44 @@ def get_teams() -> list:
         teams.append(team(team_info))
     return teams
 
-def get_all_teams_stats(year, display_progress = True):
+def get_schedule(year):
+    url = base_url + f'/years/{year}/games.htm'
+    r = requests.get(url)
+    soup = Soup(r.content, 'html.parser')
+    table = soup.select('table#games')[0]
+    df = pd.read_html(str(table))[0]
+    df_filtered = df[df['Week'] != 'Week']
+    df_filtered = df_filtered[df_filtered['Date'] != 'Playoffs']
+
+    df_filtered.loc[:, 'Home'] = df_filtered.apply(lambda row: get_home_team(row), axis=1)
+    df_filtered.loc[:, 'Away'] = df_filtered.apply(lambda row: get_away_team(row), axis=1)
+    df_filtered = df_filtered.drop(columns=[df_filtered.columns[5], df_filtered.columns[7]])
+    # df_filtered = df_filtered.drop(df_filtered.columns[6], axis=1)
+
+    return df_filtered
+
+def get_home_team(row):
+    return row['Loser/tie'] if row[5] == '@' else row['Winner/tie']
+def get_away_team(row):
+    return row['Winner/tie'] if row[5] == '@' else row['Loser/tie']    
+
+def get_all_teams_stats(year, reload = False):
     data = {}
     year_data = {}
     teams = get_teams()
     
-    printProgressBar(0, len(teams), prefix = f'Progress [0]:', suffix = 'Complete', length = 50)
+    printProgressBar(0, len(teams), prefix = 'Progress:', suffix = 'Complete', length = 50)
     for index, team in enumerate(teams):
-        printProgressBar(index + 1, len(teams), prefix = f'Progress [0]:', suffix = 'Complete', length = 50)
-        year_data[team.name] = get_teams_stats(team.abbr, year)
+        printProgressBar(index + 1, len(teams), prefix = 'Progress:', suffix = 'Complete', length = 50)
+        year_data[team.name] = get_teams_stats(team.abbr, year, reload)
         
     data[year] = year_data
     return data
 
-def get_teams_stats(team_abbr: str, year: str):
+def get_teams_stats(team_abbr: str, year: str, reload = False):
     df = get_stats_from_csv(f'{team_abbr}_{year}')
     
-    if df is None:    
+    if (df is None) or reload:    
         column_names = []
     
         url = base_url + f"/teams/{team_abbr}/{year}.htm"
@@ -70,8 +91,8 @@ def get_teams_stats(team_abbr: str, year: str):
         # TODO: This is the slow up, look for more efficient parsing methods.
         #       The html returned is huge especially given we only need the first
         #       table, can we be more specific?
-        soup = Soup(r.content, 'html.parser')
-        
+        soup = Soup(r.content, 'lxml')
+     
         # Could get this info simpler from the main season page, but the parsing
         # takes forever so its quicker to just scrape through the team data
         meta_div = soup.find_all('div', {'data-template': 'Partials/Teams/Summary'})[0]
@@ -83,13 +104,23 @@ def get_teams_stats(team_abbr: str, year: str):
         record_parts = record.split('-')
         record_vals = [int(x) for x in record_parts]
         
-        table = soup.find('table')
-        head = table.find('thead')
+        # table = soup.find('table')
+        table = soup.select("table#team_stats")[0]
+        # head = table.find('thead')
         rows = table.find_all('tr')
         
-        second_header = head.find_all('tr')[1]
-        parsed_header = parse_header(second_header)
-        column_names = parsed_header[1:]
+        # second_header = head.find_all('tr')[1]
+        # parsed_header = parse_header(second_header)
+        # column_names = parsed_header[1:]
+        
+        # Hard coded the columns because the column headers repeat causing data to 
+        # to be lost. For example there are 'Yds' columns for Total, Passing, Rushing,
+        # Penalties, and Average Drive which overwrite eachother.
+        column_names = ['PF','Yds','Ply','Y/P','TO','FL','1stD','Cmp','Pass Att',
+                        'Pass Yds','Pass TD','Int','NY/A','Pass 1stD','Rush Att',
+                        'Rush Yds','Rush Tds','Y/A','Rush 1stD','Pen','Pen Yds',
+                        '1stPy','#Dr','Sc%','TO%','Start','Time','Plays',
+                        'Yds Per Drive','Pts']
     
         list_of_parsed_rows = [parse_row(row) for row in rows]
         data = {'Wins':[record_vals[0],record_vals[0]],
@@ -98,6 +129,10 @@ def get_teams_stats(team_abbr: str, year: str):
         
         data.update({x:[list_of_parsed_rows[2][index], list_of_parsed_rows[3][index]] for index, x in enumerate(column_names)})
         df = pd.DataFrame(data, index=['Offense', 'Defense'])
+        for index in df.index:
+            df.loc[index, 'Start'] = df.loc[index, 'Start'].split(' ')[1]
+            time = df.loc[index, 'Time'].split(':')
+            df.loc[index, 'Time'] = int(time[0]) + (int(time[1]) / 60)
     
         save_stats_to_csv(df, f'{team_abbr}_{year}')
     
