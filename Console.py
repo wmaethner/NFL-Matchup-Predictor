@@ -12,8 +12,9 @@ import pandas as pd
 import numpy as np
 
 from Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, get_schedule)
-from Predictors.Predictors import Offense_Correlation
-from Predictors.Analyzer import analyze_predicter
+from Predicters.Predicters import (Offense_Correlation, Team_Stats_Only_Correlation, 
+                                   Offense_Minus_Defense_Correlation)
+from Predicters.Analyzer import analyze_predicter
 
 def explore(obj):
     if type(obj) is dict:
@@ -47,38 +48,36 @@ def main():
     pd.set_option('display.max_columns', None)
     
     # explore(get_schedule(2021))
-    
+    # year = 2021
+    # data = get_all_teams_stats(year)
+    # explore(data)
     # return
+    
     predicters = []
     for year in [2020,2021]:
         predicters.append(Offense_Correlation(year))
-
+        
+    print("Offense Correlation")
     for predicter in predicters:
         analyze_predicter(predicter)
 
-    # print(predictor.predict_winner("Arizona Cardinals", "Atlanta Falcons"))
-    return
-    
-    
-    
-    
-    data = get_all_teams_stats(2021)
-    all_offenses = {key:value for key,value in data[2021].items()}
-    vertical_stack = pd.concat({key: x.head(1) for key, x in all_offenses.items()}, axis=0)
-    vertical_stack = vertical_stack.reset_index(level=1, drop=True)
-    cols = ['PF', 'Yds']
-    offense_normal = (vertical_stack-vertical_stack.min())/(vertical_stack.max()-vertical_stack.min())
-    correlation = vertical_stack.corr()
-    win_corr = correlation.iloc[0,3:]
-    
-    for key in win_corr.index:
-        print(key)
+    predicters = []
+    for year in [2020,2021]:
+        predicters.append(Team_Stats_Only_Correlation(year))
         
-    for team in offense_normal.index:
-        total = 0
-        for key in win_corr.index:
-            total += win_corr[key] * offense_normal.loc[team, key]
-        print(f'{team} - {total}')
+    print("Team Stats Correlation")
+    for predicter in predicters:
+        analyze_predicter(predicter)
+
+    predicters = []
+    for year in [2020,2021]:
+        predicters.append(Offense_Minus_Defense_Correlation(year))
+        
+    print("Offense Minus Defense Correlation")
+    for predicter in predicters:
+        analyze_predicter(predicter)
+
+    return
 
 
 if __name__ == "__main__":
