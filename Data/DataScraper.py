@@ -9,42 +9,64 @@ Created on Mon Jan 31 19:43:08 2022
 import pandas as pd
 
 import requests
-import pprint
-import textwrap
-import shutil
-import typing
 
 from pathlib import Path  
 from pandas import DataFrame
 from bs4 import BeautifulSoup as Soup
 
-
 base_url = "https://www.pro-football-reference.com"
+teams = []
+stats = {}
 
 class team:
     def __init__(self, team_tag):
+        self.id_num = 1
         self.name = team_tag.a.get_text()
         self.abbr = team_tag.a.get('href').split('/')[-2]
+        self.aliases = []
         
     def __str__(self):
         return f"{self.name} - {self.abbr}"
+    
+    def set_id(self, id_num):
+        self.id_num = id_num
+        
+    def add_alias(self, alias):
+        self.aliases.append(alias)
+
 
 def get_teams() -> list:
+    if teams:
+        return teams
+    
     r = requests.get(base_url + "/teams/")
     soup = Soup(r.content, 'html.parser')
-    table = soup.find_all('table')[0]
-    rows = table.find_all('tr')
-    partial_rows = table.find_all('tr', {'class': 'partial_table'}) # Inactive teams
-    team_rows = [row for row in rows if row not in partial_rows][2:] # Skip header rows
-    teams = []
-    for x in team_rows:
-        team_info = x.find('th')
-        # print(team_info.find('a'))
-        # print(team_info.a.get_text())
-        # print(f"{team_info.a.get_text()} - {team_info.a.get('href')} - {team_info.a.get('href').split('/')[-2]}")
-        # print(x)
-        teams.append(team(team_info))
+    table = soup.select('table#teams_active')[0]
+    body = table.find('tbody')
+    rows = body.find_all('tr')
+    
+    current = team(rows[0].find('th'))
+    for x in rows[1:]:
+        th_tag = x.find('th')
+        classes = x.attrs.get('class')
+        if (not classes is None) and ('partial_table' in classes):
+            current.add_alias(th_tag.get_text())
+        else:
+            teams.append(current)
+            current = team(th_tag)
+    teams.append(current)    
+
+    for index, t in enumerate(teams):
+        t.set_id(index)
+
     return teams
+
+def get_team_id(name_or_alias):
+    for t in teams:
+        options = [x for x in t.aliases]
+        options.append(t.name)
+        if name_or_alias in options:
+            return t.id_num
 
 def get_schedule(year):
     url = base_url + f'/years/{year}/games.htm'
@@ -58,7 +80,6 @@ def get_schedule(year):
     df_filtered.loc[:, 'Home'] = df_filtered.apply(lambda row: get_home_team(row), axis=1)
     df_filtered.loc[:, 'Away'] = df_filtered.apply(lambda row: get_away_team(row), axis=1)
     df_filtered = df_filtered.drop(columns=[df_filtered.columns[5], df_filtered.columns[7]])
-    # df_filtered = df_filtered.drop(df_filtered.columns[6], axis=1)
 
     return df_filtered
 
@@ -68,6 +89,9 @@ def get_away_team(row):
     return row['Winner/tie'] if row[5] == '@' else row['Loser/tie']    
 
 def get_all_teams_stats(year, reload = False):
+    if year in stats.keys():
+        return stats
+    
     data = {}
     year_data = {}
     teams = get_teams()
@@ -78,6 +102,7 @@ def get_all_teams_stats(year, reload = False):
         year_data[team.name] = get_teams_stats(team.abbr, year, reload)
         
     data[year] = year_data
+    stats[year] = year_data
     return data
 
 def get_teams_stats(team_abbr: str, year: str, reload = False):
@@ -134,6 +159,7 @@ def get_teams_stats(team_abbr: str, year: str, reload = False):
             time = df.loc[index, 'Time'].split(':')
             df.loc[index, 'Time'] = int(time[0]) + (int(time[1]) / 60)
     
+        df = df.apply(pd.to_numeric)
         save_stats_to_csv(df, f'{team_abbr}_{year}')
     
     return df
