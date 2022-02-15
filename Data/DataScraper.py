@@ -13,10 +13,87 @@ import requests
 from pathlib import Path  
 from pandas import DataFrame
 from bs4 import BeautifulSoup as Soup
+from utilities import (PFR_BASE_URL, parse_page, get_table_by_id, parse_table,
+                       save_obj, load_obj, file_exists)
 
 base_url = "https://www.pro-football-reference.com"
 teams = []
 stats = {}
+
+
+class Data_Scraper:  
+    def __init__(self):
+        self.stats = {}
+    
+    def data_columns(self):
+        return ['Wins','Losses','Ties','PF','Yds','Ply','Y/P','TO','FL','1stD',
+                'Cmp','Pass Att','Pass Yds','Pass TD','Int','NY/A','Pass 1stD',
+                'Rush Att','Rush Yds','Rush Tds','Y/A','Rush 1stD','Pen','Pen Yds',
+                '1stPy','#Dr','Sc%','TO%','Start','Time','Plays','Yds Per Drive','Pts']
+    
+    def load_stats(self, team_key, year):
+        if file_exists('Data/Stats', f'{team_key}.pkl'):
+            self.stats[team_key] = load_obj('Data/Stats', f'{team_key}.pkl')
+            if year in self.stats[team_key].keys():
+                return
+        
+        url = PFR_BASE_URL + f"/teams/{team_key}/{year}.htm"
+        soup = parse_page(url)
+        
+        # Could get this info simpler from the main season page, but the parsing
+        # takes forever so its quicker to just scrape through the team data
+        meta_div = soup.find_all('div', {'data-template': 'Partials/Teams/Summary'})[0]
+        record_p = meta_div.find_all('p')[0]
+        end_tag = '</strong>'
+        end_tag_index = str(record_p).find(end_tag)
+        comma_index = str(record_p).find(',',end_tag_index)
+        record = str(record_p)[end_tag_index+len(end_tag)+1:comma_index]
+        record_parts = record.split('-')
+        record_vals = [int(x) for x in record_parts]
+        
+        table = get_table_by_id(soup, 'team_stats')
+        parsed_rows = parse_table(table)
+        
+        offense = [record_vals[0],record_vals[1],record_vals[2]]
+        defense = [record_vals[0],record_vals[1],record_vals[2]]
+        
+        offense.extend(parsed_rows[2])
+        defense.extend(parsed_rows[3])
+        
+        start_index = self.data_columns().index('Start')
+        time_index = self.data_columns().index('Time')
+        
+        offense[start_index] = offense[start_index].split(' ')[1]
+        defense[start_index] = defense[start_index].split(' ')[1]
+        
+        time = offense[time_index].split(':')
+        offense[time_index]  = int(time[0]) + (int(time[1]) / 60)
+
+        time = defense[time_index].split(':')
+        defense[time_index]  = int(time[0]) + (int(time[1]) / 60)
+        
+        if not team_key in self.stats.keys():
+            self.stats[team_key] = {}
+            
+        self.stats[team_key][year] = {}
+        self.stats[team_key][year]['Offense'] = [float(x) for x in offense]
+        self.stats[team_key][year]['Defense'] = [float(x) for x in defense]
+        
+        save_obj('Data/Stats', f'{team_key}.pkl', self.stats[team_key])
+
+    def get_teams_stats(self, team_key, year, fmt = 0):
+        if not team_key in self.stats.keys():
+            self.load_stats(team_key, year)
+            
+        if not year in self.stats[team_key].keys():
+            self.load_stats(team_key, year)
+        
+        if fmt == 0:
+            return self.stats[team_key][year]
+        elif fmt == 1:
+            df = pd.DataFrame(self.stats[team_key][year]).T
+            df.columns = self.data_columns()
+            return df
 
 class team:
     def __init__(self, team_tag):
@@ -108,15 +185,12 @@ def get_all_teams_stats(year, reload = False):
 def get_teams_stats(team_abbr: str, year: str, reload = False):
     df = get_stats_from_csv(f'{team_abbr}_{year}')
     
-    if (df is None) or reload:    
+    if (df is None) or reload:  
+        print('loading')
         column_names = []
     
         url = base_url + f"/teams/{team_abbr}/{year}.htm"
-        r = requests.get(url)
-        # TODO: This is the slow up, look for more efficient parsing methods.
-        #       The html returned is huge especially given we only need the first
-        #       table, can we be more specific?
-        soup = Soup(r.content, 'lxml')
+        soup = parse_page(url)
      
         # Could get this info simpler from the main season page, but the parsing
         # takes forever so its quicker to just scrape through the team data
@@ -129,14 +203,8 @@ def get_teams_stats(team_abbr: str, year: str, reload = False):
         record_parts = record.split('-')
         record_vals = [int(x) for x in record_parts]
         
-        # table = soup.find('table')
-        table = soup.select("table#team_stats")[0]
-        # head = table.find('thead')
-        rows = table.find_all('tr')
-        
-        # second_header = head.find_all('tr')[1]
-        # parsed_header = parse_header(second_header)
-        # column_names = parsed_header[1:]
+        table = get_table_by_id(soup, 'team_stats')
+        parsed_rows = parse_table(table)
         
         # Hard coded the columns because the column headers repeat causing data to 
         # to be lost. For example there are 'Yds' columns for Total, Passing, Rushing,
@@ -147,12 +215,12 @@ def get_teams_stats(team_abbr: str, year: str, reload = False):
                         '1stPy','#Dr','Sc%','TO%','Start','Time','Plays',
                         'Yds Per Drive','Pts']
     
-        list_of_parsed_rows = [parse_row(row) for row in rows]
         data = {'Wins':[record_vals[0],record_vals[0]],
                 'Losses':[record_vals[1],record_vals[1]],
                 'Ties':[record_vals[2],record_vals[2]]}
         
-        data.update({x:[list_of_parsed_rows[2][index], list_of_parsed_rows[3][index]] for index, x in enumerate(column_names)})
+        # data.update({x:[list_of_parsed_rows[2][index], list_of_parsed_rows[3][index]] for index, x in enumerate(column_names)})
+        data.update({x:[parsed_rows[2][index], parsed_rows[3][index]] for index, x in enumerate(column_names)})
         df = pd.DataFrame(data, index=['Offense', 'Defense'])
         for index in df.index:
             df.loc[index, 'Start'] = df.loc[index, 'Start'].split(' ')[1]
