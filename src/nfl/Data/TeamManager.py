@@ -6,8 +6,10 @@ Created on Mon Feb 14 15:52:01 2022
 @author: willmaethner
 """
 
-from nfl.Core.utilities import (PFR_BASE_URL, parse_page, get_table_by_id, get_table_body_rows,
-                                             save_obj, load_obj, file_exists, start_timer, stop_timer)
+from nfl.Core.utilities import (PFR_BASE_URL, parse_page, get_table_by_id, 
+                                get_table_body_rows, save_obj, load_obj, 
+                                file_exists, start_timer, stop_timer, 
+                                printProgressBar)
 from nfl.Data.DataScraper import Data_Scraper
 
 class Team:
@@ -43,10 +45,6 @@ class Team_Manager:
         
         soup = parse_page(PFR_BASE_URL + '/teams/')
         rows = get_table_body_rows(soup, 'teams_active')
-        # table = get_table_by_id(soup, 'teams_active')
-        
-        # body = table.find('tbody')
-        # rows = body.find_all('tr')
         
         current = Team(rows[0].find('th'))
         for x in rows[1:]:
@@ -80,4 +78,7 @@ class Team_Manager:
             
     def get_teams_stats(self, team_id, year, fmt = 0):
         return self.data_scraper.get_teams_stats(self.get_team(team_id).abbr, year, fmt)
+    
+    def load_all_teams_stats(self, year):
+        pass
     
