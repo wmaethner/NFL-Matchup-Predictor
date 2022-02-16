@@ -6,12 +6,9 @@ Created on Mon Feb 14 15:52:01 2022
 @author: willmaethner
 """
 
-import sys
-sys.path.append('../NFL_Matchup_Predictor')
-
-from NFL_Matchup_Predictor.utilities import (PFR_BASE_URL, parse_page, get_table_by_id, get_table_body_rows,
-                                             save_obj, load_obj, file_exists)
-from Data.DataScraper import Data_Scraper
+from nfl.Core.utilities import (PFR_BASE_URL, parse_page, get_table_by_id, get_table_body_rows,
+                                             save_obj, load_obj, file_exists, start_timer, stop_timer)
+from nfl.Data.DataScraper import Data_Scraper
 
 class Team:
     def __init__(self, team_tag):
@@ -36,12 +33,13 @@ class Team_Manager:
     def __init__(self):
         self.teams = []
         self.data_scraper = Data_Scraper()
-        
         self.load_teams()
+
         
     def load_teams(self):
-        if file_exists('Data/Teams', 'teams.pkl'):
-            self.teams = load_obj('Data/Teams', 'teams.pkl')
+        if file_exists('teams.pkl'):
+            self.teams = load_obj('teams.pkl')
+            return
         
         soup = parse_page(PFR_BASE_URL + '/teams/')
         rows = get_table_body_rows(soup, 'teams_active')
@@ -64,7 +62,7 @@ class Team_Manager:
         for index, t in enumerate(self.teams):
             t.set_id(index)
             
-        save_obj('Data/Teams', 'teams.pkl', self.teams)
+        save_obj('teams.pkl', self.teams)
     
     def get_team_id(self, name_or_alias):
         for t in self.teams:

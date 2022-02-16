@@ -13,13 +13,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+from nfl.Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, 
+                                  get_schedule, get_team_id, Data_Scraper)
+from nfl.Data.TeamManager import Team_Manager
 
-from Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, get_schedule,
-                              get_team_id, Data_Scraper)
-from Predicters.Predicters import (Offense_Correlation, Team_Stats_Only_Correlation, 
+from nfl.Predicters.Predicters import (Offense_Correlation, Team_Stats_Only_Correlation, 
                                    Offense_Minus_Defense_Correlation)
-from Predicters.Analyzer import analyze_predicter
-from Data.TeamManager import Team_Manager
+from nfl.Predicters.Analyzer import analyze_predicter
+
 
 from utilities import (PFR_BASE_URL, start_timer, stop_timer, parse_page, 
                        get_table_by_id, parse_table, parse_page)
@@ -85,8 +86,11 @@ def main():
     # df.columns = ds.data_columns()
     # print(df)
     
-    # tm = Team_Manager()
-    # print(tm.get_teams_stats(1,2021,1))
+    data = start_timer('Team Manager Initialize')
+    tm = Team_Manager()
+    stop_timer(data, True)
+    print(tm.get_teams_stats(1,2021,1))
+
     
     # url = PFR_BASE_URL + f"/teams/crd/2021.htm"
     # soup = parse_page(url)

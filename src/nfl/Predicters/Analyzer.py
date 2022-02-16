@@ -6,7 +6,8 @@ Created on Sun Feb  6 20:32:15 2022
 @author: willmaethner
 """
 
-from Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, get_schedule)
+from nfl.Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, 
+                                  get_schedule)
 
 
 def analyze_predicter(predicter, years: list, print_results = True):

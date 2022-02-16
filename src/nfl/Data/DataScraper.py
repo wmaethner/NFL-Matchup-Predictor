@@ -32,8 +32,8 @@ class Data_Scraper:
                 '1stPy','#Dr','Sc%','TO%','Start','Time','Plays','Yds Per Drive','Pts']
     
     def load_stats(self, team_key, year):
-        if file_exists('Data/Stats', f'{team_key}.pkl'):
-            self.stats[team_key] = load_obj('Data/Stats', f'{team_key}.pkl')
+        if file_exists(f'{team_key}.pkl'):
+            self.stats[team_key] = load_obj(f'{team_key}.pkl')
             if year in self.stats[team_key].keys():
                 return
         
@@ -79,7 +79,7 @@ class Data_Scraper:
         self.stats[team_key][year]['Offense'] = [float(x) for x in offense]
         self.stats[team_key][year]['Defense'] = [float(x) for x in defense]
         
-        save_obj('Data/Stats', f'{team_key}.pkl', self.stats[team_key])
+        save_obj(f'{team_key}.pkl', self.stats[team_key])
 
     def get_teams_stats(self, team_key, year, fmt = 0):
         if not team_key in self.stats.keys():
