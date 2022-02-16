@@ -48,7 +48,6 @@ def get_table_body_rows(soup, table_id):
     body = table.find('tbody')
     return body.find_all('tr')
     
-
 def parse_table(table):
     rows = table.find_all('tr')
     return [[str(x.string) for x in row.find_all('td')] for row in rows]
@@ -100,3 +99,26 @@ def load_obj(filename, path = CACHE_PATH):
     with open(f'{path}/{filename}', 'rb') as p:
         return pickle.load(p)
 
+
+
+# Display Helpers
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+    # Print New Line on Complete
+    if iteration == total: 
+        print()

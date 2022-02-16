@@ -8,21 +8,17 @@ Created on Sun Feb  6 20:30:48 2022
 
 import pandas as pd
 
+from nfl.Core.utilities import (printProgressBar)
 from nfl.Data.TeamManager import Team_Manager
 
-from nfl.Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, get_team_id)
-
-
-def get_all_stats1(year):
+def get_all_stats(year):
     tm = Team_Manager()
     data = {}
-    for t in tm.teams:
-        data[t.id_num] = tm.get_teams_stats(t.id_num, year)
+    printProgressBar(0, len(tm.teams), prefix = 'Progress:', suffix = 'Complete', length = 50)
+    for index, t in enumerate(tm.teams):
+        printProgressBar(index + 1, len(tm.teams), prefix = 'Progress:', suffix = 'Complete', length = 50)
+        data[t.id_num] = tm.get_teams_stats(t.id_num, year, 1)
     return data
-
-def get_all_stats(year):
-    data = get_all_teams_stats(year)
-    return {get_team_id(key):value for key,value in data[year].items()}
 
 def concat_year_stats(yearly_stats, row_index):
     all_stats = pd.DataFrame()
@@ -53,6 +49,7 @@ class Offense_Correlation:
     def __init__(self, years):
         self.years = years
         self.team_offense_scores = {}
+        self.tm = Team_Manager()
         
         df_means = get_mean_stats(years, 0)
 
@@ -65,8 +62,8 @@ class Offense_Correlation:
             self.team_offense_scores[team] = total
     
     def predict_winner(self, home, away):
-        home_score = self.team_offense_scores[get_team_id(home)]
-        away_score = self.team_offense_scores[get_team_id(away)]
+        home_score = self.team_offense_scores[self.tm.get_team_id(home)]
+        away_score = self.team_offense_scores[self.tm.get_team_id(away)]
             
         return get_winner_percentages(home, home_score, away, away_score)
     
@@ -74,6 +71,7 @@ class Team_Stats_Only_Correlation:
     def __init__(self, years):
         self.years = years
         self.team_scores = {}
+        self.tm = Team_Manager()
         
         df_means_off = get_mean_stats(years, 0)
         df_means_def = get_mean_stats(years, 1)
@@ -90,8 +88,8 @@ class Team_Stats_Only_Correlation:
             self.team_scores[team] = total
     
     def predict_winner(self, home, away):
-        home_score = self.team_scores[get_team_id(home)]
-        away_score = self.team_scores[get_team_id(away)]
+        home_score = self.team_scores[self.tm.get_team_id(home)]
+        away_score = self.team_scores[self.tm.get_team_id(away)]
             
         return get_winner_percentages(home, home_score, away, away_score)
     
@@ -102,6 +100,7 @@ class Offense_Minus_Defense_Correlation:
         self.years = years
         self.team_offense_scores = {}
         self.team_defense_scores = {}
+        self.tm = Team_Manager()
         
         df_means_off = get_mean_stats(years, 0)
         df_means_def = get_mean_stats(years, 1)
@@ -119,7 +118,7 @@ class Offense_Minus_Defense_Correlation:
             self.team_defense_scores[team] = total_def
     
     def predict_winner(self, home, away):
-        home_score = self.team_offense_scores[get_team_id(home)] - self.team_defense_scores[get_team_id(away)]
-        away_score = self.team_offense_scores[get_team_id(away)] - self.team_defense_scores[get_team_id(home)]
+        home_score = self.team_offense_scores[self.tm.get_team_id(home)] - self.team_defense_scores[self.tm.get_team_id(away)]
+        away_score = self.team_offense_scores[self.tm.get_team_id(away)] - self.team_defense_scores[self.tm.get_team_id(home)]
             
         return get_winner_percentages(home, home_score, away, away_score)

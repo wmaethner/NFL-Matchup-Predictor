@@ -6,18 +6,17 @@ Created on Sun Feb  6 20:32:15 2022
 @author: willmaethner
 """
 
-from nfl.Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, 
-                                  get_schedule)
-
+from nfl.Data.DataScraper import Data_Scraper
 
 def analyze_predicter(predicter, years: list, print_results = True):
+    ds = Data_Scraper()
     total = 0
     total_right = 0
     
-    for year  in years:
+    for year in years:
         year_total = 0
         year_right = 0
-        schedule = get_schedule(year)
+        schedule = ds.get_schedule(year)
         
         for index, row in schedule.iterrows():
             home = row['Home']

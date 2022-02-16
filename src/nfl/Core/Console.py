@@ -13,8 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-from nfl.Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, 
-                                  get_schedule, get_team_id, Data_Scraper)
+from nfl.Data.DataScraper import Data_Scraper
 from nfl.Data.TeamManager import Team_Manager
 
 from nfl.Predicters.Predicters import (Offense_Correlation, Team_Stats_Only_Correlation, 
@@ -65,19 +64,27 @@ def make_prediction(year, home, away):
 def analyze_predicters(data_year):
     print(f'Data from year {data_year}')
     off = Offense_Correlation([data_year])
-    stats = Team_Stats_Only_Correlation(data_year)
-    off_def = Offense_Minus_Defense_Correlation(data_year)
+    stats = Team_Stats_Only_Correlation([data_year])
+    off_def = Offense_Minus_Defense_Correlation([data_year])
     
     for year in range(2019, 2022):
         print(f'{year}')
-        analyze_predicter(off, year)
-        analyze_predicter(stats, year)
-        analyze_predicter(off_def, year)
+        analyze_predicter(off, [year])
+        analyze_predicter(stats, [year])
+        analyze_predicter(off_def, [year])
         
 
 
 def main():
     pd.set_option('display.max_columns', None)
+    
+    # tm = Team_Manager()
+    # print(len(tm.teams))
+    # return
+    
+    ds = Data_Scraper()
+    print(ds.get_schedule(2021))
+    return
     
     # ds = Data_Scraper()
     # stats = ds.get_teams_stats('crd',2021,1)
@@ -86,10 +93,10 @@ def main():
     # df.columns = ds.data_columns()
     # print(df)
     
-    data = start_timer('Team Manager Initialize')
-    tm = Team_Manager()
-    stop_timer(data, True)
-    print(tm.get_teams_stats(1,2021,1))
+    # data = start_timer('Team Manager Initialize')
+    # tm = Team_Manager()
+    # stop_timer(data, True)
+    # print(tm.get_teams_stats(1,2021,1))
 
     
     # url = PFR_BASE_URL + f"/teams/crd/2021.htm"
@@ -98,13 +105,11 @@ def main():
     # stats = parse_table(table)
     # print(stats)
     
-    # stats = get_teams_stats('crd', 2021, True)
+
     # print(stats)
     
-    
-    return
-    
-    # for year in range(2019, 2022):
+   
+    # for year in range(2021, 2022):
     #     analyze_predicters(year)
     # analyze_predicters(2021)
     
@@ -179,10 +184,6 @@ def main():
             
     # return
     
-    # teams = get_teams()
-    # for x in teams:
-    #     print(f'{x.id_num} - {x.name} - {x.aliases}')
-    # # print(teams)
     
     # # make_prediction(2021, 'Los Angeles Rams', 'Cincinnati Bengals')
     # return
