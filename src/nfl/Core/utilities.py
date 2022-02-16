@@ -19,6 +19,7 @@ from bs4 import BeautifulSoup as Soup
 #############
 
 PFR_BASE_URL = "https://www.pro-football-reference.com"
+CACHE_PATH = "../Data/Cache"
 
 
 
@@ -57,11 +58,15 @@ def parse_table(table):
 
 
 # Timer functions
-def start_timer():
-    return perf_counter()
+def start_timer(label):
+    data = {'label':label, 'start':perf_counter()}
+    return data
 
-def stop_timer(start):
-    return perf_counter()-start
+def stop_timer(start_obj, print_results = False):
+    start_obj['elapsed'] = perf_counter() - start_obj['start'] 
+    if print_results:
+        print(f'{start_obj["label"]}: {start_obj["elapsed"]}')
+    return start_obj
 
 # Serialization
 def path_exists(path):
@@ -79,11 +84,11 @@ def path_exists(path):
     """
     return os.path.exists(path)
 
-def file_exists(path, filename):
+def file_exists(filename, path = CACHE_PATH):
     filepath = Path(f'{path}/{filename}')  
     return filepath.exists()
 
-def save_obj(path, filename, obj):
+def save_obj(filename, obj, path = CACHE_PATH):
     if not os.path.exists(path):
         os.makedirs(path)
     
@@ -91,7 +96,7 @@ def save_obj(path, filename, obj):
     pickle.dump(obj, f)
     f.close()
     
-def load_obj(path, filename):
+def load_obj(filename, path = CACHE_PATH):
     with open(f'{path}/{filename}', 'rb') as p:
         return pickle.load(p)
 

@@ -8,9 +8,9 @@ Created on Sun Feb  6 20:30:48 2022
 
 import pandas as pd
 
-from Data.TeamManager import Team_Manager
+from nfl.Data.TeamManager import Team_Manager
 
-from Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, get_team_id)
+from nfl.Data.DataScraper import (get_teams, get_all_teams_stats, get_teams_stats, get_team_id)
 
 
 def get_all_stats1(year):
