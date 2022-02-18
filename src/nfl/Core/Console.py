@@ -16,10 +16,8 @@ import matplotlib.pyplot as plt
 from nfl.Data.DataScraper import Data_Scraper
 from nfl.Data.TeamManager import Team_Manager
 
-from nfl.Predicters.Predicters import (Offense_Correlation, 
-                                       Team_Stats_Only_Correlation, 
-                                       TensorFlowBasic,
-                                       TensorFlowBothStats)
+from nfl.Predicters.Predicters import (Offense_Correlation,  
+                                       TensorFlowBasic)
 from nfl.Predicters.Analyzer import analyze_predicter
 
 
@@ -56,24 +54,23 @@ def explore_dict(dictionary):
 
 def make_prediction(year, home, away):
     off = Offense_Correlation(year)
-    stats = Team_Stats_Only_Correlation(year)
+    # stats = Team_Stats_Only_Correlation(year)
     # off_def = Offense_Minus_Defense_Correlation(year)
     print(f'Matchup: {home} - {away}')
     print(off.predict_winner(home, away))
-    print(stats.predict_winner(home, away))
+    # print(stats.predict_winner(home, away))
     # print(off_def.predict_winner(home, away))
 
 def analyze_predicters(train_years, test_years):
-    off = Offense_Correlation(train_years)
-    stats = Team_Stats_Only_Correlation(train_years)
-    tfb = TensorFlowBasic(train_years)
-    tfbs = TensorFlowBothStats(train_years)
-
-    
+    off = Offense_Correlation(train_years, False)
+    both = Offense_Correlation(train_years, True)
+    tfb = TensorFlowBasic(train_years, False)
+    tfb_both = TensorFlowBasic(train_years, True)
+   
     analyze_predicter(off, test_years)
-    analyze_predicter(stats, test_years)
+    analyze_predicter(both, test_years)
     analyze_predicter(tfb, test_years)
-    analyze_predicter(tfbs, test_years)
+    analyze_predicter(tfb_both, test_years)
 
        
 def save_stats_to_csvs(years):
@@ -99,6 +96,7 @@ def main():
     
     ds = Data_Scraper()
     tm = Team_Manager()
+    
    
     # train_years = [2017]
     # test_years = [2017]
@@ -110,12 +108,8 @@ def main():
     #     print('========================')
     # return
     
-    # analyze_predicters([2017,2018,2019,2020,2021], [2020,2021])
+    analyze_predicters([2017,2018,2019,2020,2021], [2020,2021])
     
-    off_corr = Team_Stats_Only_Correlation([2021])
-    analyze_predicter(off_corr, [2021])
-    # tfb = TensorFlowBasic(train_years)
-    # analyze_predicter(tfb, test_years)
     return
     
     # print(tfb.train_data)

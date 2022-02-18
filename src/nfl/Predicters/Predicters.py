@@ -58,99 +58,88 @@ class YearsNormalStats:
     def __init__(self, year):
         self.offense = normalized_stats(year)
         self.defense = normalized_stats(year, False)
-
-class PredicterBase:
-    def __init__(self, years):
-        self.years = years
-        self.normalized_stats = {}
         
-        for year in years:
-            self.normalized_stats[year] = YearsNormalStats(year)
-
-class Offense_Correlation(PredicterBase):
-    def __init__(self, years):
-        PredicterBase.__init__(self, years)
-        
-        df_means = get_mean_stats(years, 0)
-        win_corr, offense_normal = get_correlation_normalized_stats(df_means)
-        
-        self.correlations = {}
-        self.correlations['Offense'] = win_corr
-        
+    def get_normals(self):
+        return (self.offense, self.defense)
     
-    def predict_winner(self, home, away, year):
-        offense_normal = self.normalized_stats[year].offense
-        
-        home_score = 0
-        away_score = 0
-        for key in self.correlations['Offense'].index:
-            home_score += self.correlations['Offense'][key] * offense_normal.loc[home, key]
-            away_score += self.correlations['Offense'][key] * offense_normal.loc[away, key]
-            
-        return get_winner_percentages(home, home_score, away, away_score)
-    
-class Team_Stats_Only_Correlation:
+    def get_normals_as_numpy(self):
+        return (self.offense.to_numpy(), self.defense.to_numpy())
+
+class Correlations:
     def __init__(self, years):
-        PredicterBase.__init__(self, years)
-        
         df_means_off = get_mean_stats(years, 0)
         df_means_def = get_mean_stats(years, 1)
 
         offense_corr, offense_normal = get_correlation_normalized_stats(df_means_off)
         defense_corr, defense_normal = get_correlation_normalized_stats(df_means_def)
         
-        self.correlations = {}
-        self.correlations['Offense'] = offense_corr
-        self.correlations['Defense'] = defense_corr
+        self.offense = offense_corr
+        self.defense = defense_corr
+    
+    def get_corrs(self):
+        return (self.offense, self.defense)
 
+class PredicterBase:
+    def __init__(self, years, include_defense):
+        self.years = years
+        self.include_defense = include_defense
+        self.normalized_stats = {}
+        
+        for year in years:
+            self.normalized_stats[year] = YearsNormalStats(year)
+
+class Offense_Correlation(PredicterBase):
+    def __init__(self, years, include_defense):
+        PredicterBase.__init__(self, years, include_defense)
+        self.correlations = Correlations(years)     
     
     def predict_winner(self, home, away, year):
-        offense_normal = self.normalized_stats[year].offense
-        defense_normal = self.normalized_stats[year].defense
+        offense_normal, defense_normal = self.normalized_stats[year].get_normals()
+        offense_corr, defense_corr = self.correlations.get_corrs()
         
         home_score = 0
         away_score = 0
-        for key in self.correlations['Offense'].index:
-            home_score += self.correlations['Offense'][key] * offense_normal.loc[home, key]
-            home_score += self.correlations['Defense'][key] * defense_normal.loc[home, key]
-            away_score += self.correlations['Offense'][key] * offense_normal.loc[away, key]
-            away_score += self.correlations['Defense'][key] * defense_normal.loc[away, key]
+        for key in offense_corr.index:
+            home_score += offense_corr[key] * offense_normal.loc[home, key]
+            away_score += offense_corr[key] * offense_normal.loc[away, key]
+            if self.include_defense:
+                home_score += defense_corr[key] * defense_normal.loc[home, key]
+                away_score += defense_corr[key] * defense_normal.loc[away, key]              
             
         return get_winner_percentages(home, home_score, away, away_score)
        
-class TensorFlowBasic:
-    def __init__(self, years):
-        self.train_data = []
-        self.train_results = []
-        self.test_data = []
-        self.test_results = []
+class TensorFlowBasic(PredicterBase):
+    def __init__(self, years, include_defense):
+        PredicterBase.__init__(self, years, include_defense)
         
-        self.tm = Team_Manager()
-        self.stats = {}
+        train_data = []
+        train_results = []
+        # self.test_data = []
+        # self.test_results = []
         
+        tm = Team_Manager()      
         ds = Data_Scraper()       
         
         for year in years:    
-            offense_normal = normalized_stats(year)
-           
-            offense_numpy = offense_normal.to_numpy()
-            self.stats[year] = offense_numpy
+            offense_normal, defense_normal = self.normalized_stats[year].get_normals_as_numpy()
             
             schedule = ds.get_schedule(year)
             for index, row in schedule.iterrows():
-                home = self.tm.get_team_id(row['Home'])
-                away = self.tm.get_team_id(row['Away'])
-                winner = 1 if self.tm.get_team_id(row['Winner/tie']) == home else 0
+                home = tm.get_team_id(row['Home'])
+                away = tm.get_team_id(row['Away'])
+                winner = 1 if tm.get_team_id(row['Winner/tie']) == home else 0
                 
-                data = [offense_numpy[home].tolist(), offense_numpy[away].tolist()]           
+                data = [offense_normal[home].tolist(), offense_normal[away].tolist()]   
+                if self.include_defense:
+                    data.insert(1, defense_normal[home].tolist())
+                    data.append(defense_normal[away].tolist())
                 
-                self.train_data.append(data)
-                self.train_results.append(winner)
-          
+                train_data.append(data)
+                train_results.append(winner)        
     
         self.model = tf.keras.models.Sequential([
-            tf.keras.layers.Flatten(input_shape=(2, len(self.train_data[0][0]))),
-            tf.keras.layers.Dense(10, activation='relu'),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(32, activation='relu'),
             tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Dense(2)
             ])
@@ -159,91 +148,21 @@ class TensorFlowBasic:
                       loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
                       metrics=['accuracy'])
 
-        self.model.fit(self.train_data, self.train_results, epochs=50, verbose=False)      
+        self.model.fit(train_data, train_results, epochs=50, verbose=False)      
         self.probability_model = tf.keras.Sequential([self.model, tf.keras.layers.Softmax()])
         
-    def predict_winner(self, home, away, year):
-        if not year in self.stats.keys():
-            print(f'{year} was not included in data')
-            return
+    def predict_winner(self, home, away, year):     
+        offense_normal, defense_normal = self.normalized_stats[year].get_normals_as_numpy()
+        data = [offense_normal[home].tolist(), offense_normal[away].tolist()]     
+        if self.include_defense:
+            data.insert(1, defense_normal[home].tolist())
+            data.append(defense_normal[away].tolist())
         
-        data = [self.stats[year][home].tolist(), self.stats[year][away].tolist()]     
         data_exp = (np.expand_dims(data,0))
         
         result = self.probability_model.predict(data_exp)
      
         return home if np.argmax(result) == 1 else away, np.max(result)
-        
-  
-class TensorFlowBothStats:
-    def __init__(self, years):
-        self.train_data = []
-        self.train_results = []
-        self.test_data = []
-        self.test_results = []
-        
-        self.tm = Team_Manager()
-        self.stats = {}
-        
-        ds = Data_Scraper()       
-        
-        for year in years:    
-            offense_normal = normalized_stats(year)
-            defense_normal = normalized_stats(year, False)
-            
-            offense_numpy = offense_normal.to_numpy()
-            defense_numpy = defense_normal.to_numpy()
-            self.stats[year] = {}
-            self.stats[year]['Offense'] = offense_numpy
-            self.stats[year]['Defense'] = defense_numpy
-            
-            schedule = ds.get_schedule(year)
-            for index, row in schedule.iterrows():
-                home = self.tm.get_team_id(row['Home'])
-                away = self.tm.get_team_id(row['Away'])
-                winner = 1 if self.tm.get_team_id(row['Winner/tie']) == home else 0
-                
-                data = [offense_numpy[home].tolist(), 
-                        defense_numpy[home].tolist(),
-                        offense_numpy[away].tolist(),
-                        defense_numpy[away].tolist()]           
-                
-                self.train_data.append(data)
-                self.train_results.append(winner)
-          
-    
-        self.model = tf.keras.models.Sequential([
-            tf.keras.layers.Flatten(input_shape=(4, len(self.train_data[0][0]))),
-            tf.keras.layers.Dense(10, activation='relu'),
-            tf.keras.layers.Dropout(0.2),
-            tf.keras.layers.Dense(2)
-            ])
-        
-        self.model.compile(optimizer='adam',
-                      loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                      metrics=['accuracy'])
-    
-        self.model.fit(self.train_data, self.train_results, epochs=50, verbose=False)      
-        self.probability_model = tf.keras.Sequential([self.model, tf.keras.layers.Softmax()])
-        
-    def predict_winner(self, home, away, year):
-        if not year in self.stats.keys():
-            print(f'{year} was not included in data')
-            return
-        
-        data = [self.stats[year]['Offense'][home].tolist(), 
-                self.stats[year]['Defense'][home].tolist(), 
-                self.stats[year]['Offense'][away].tolist(), 
-                self.stats[year]['Defense'][away].tolist()]     
-        data_exp = (np.expand_dims(data,0))
-        
-        result = self.probability_model.predict(data_exp)
-     
-        return home if np.argmax(result) == 1 else away, np.max(result)   
-            
-        
-        
-        
     
     
     

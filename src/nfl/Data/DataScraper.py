@@ -8,7 +8,7 @@ Created on Mon Jan 31 19:43:08 2022
 
 import pandas as pd
 
-from utilities import (PFR_BASE_URL, parse_page, get_table_by_id, parse_table,
+from nfl.Core.utilities import (PFR_BASE_URL, parse_page, get_table_by_id, parse_table,
                        save_obj, load_obj, file_exists)
 
 base_url = "https://www.pro-football-reference.com"
