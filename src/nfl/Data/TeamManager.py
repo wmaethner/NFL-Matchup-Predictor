@@ -6,6 +6,8 @@ Created on Mon Feb 14 15:52:01 2022
 @author: willmaethner
 """
 
+import pandas as pd
+
 from nfl.Core.utilities import (PFR_BASE_URL, parse_page, get_table_by_id, 
                                 get_table_body_rows, save_obj, load_obj, 
                                 file_exists, start_timer, stop_timer, 
@@ -77,7 +79,48 @@ class Team_Manager:
             raise ValueError
             
     def get_teams_stats(self, team_id, year, fmt = 0):
-        return self.data_scraper.get_teams_stats(self.get_team(team_id).abbr, year, fmt)
+        return self.data_scraper.get_teams_season_stats(self.get_team(team_id).abbr, year)
+    
+    def get_teams_season_stats(self, team_id, year):
+        return self.data_scraper.get_teams_season_stats(self.get_team(team_id).abbr, year)
+    
+    def get_teams_stats_by_week(self, 
+                                team_id, 
+                                year, 
+                                week = 0, 
+                                all_weeks = False, 
+                                sum_results = False,
+                                only_data_columns = False):
+        df = self.data_scraper.get_teams_weekly_stats(self.get_team(team_id).abbr, year)
+        # arr = df[df[('Meta','Week')] == week].index.array
+        # print(arr)
+        # week_index = min(arr) if arr else len(df.index)
+        # print(week_index)
+        if not all_weeks:
+            df.drop(df[df[('Meta','Week')].astype(int) > week].index, inplace = True)
+        # df.drop([x for x in df.index.array if x > week_index], inplace=True)
+        
+        if sum_results:
+            df.loc['Total'] = pd.Series(df.sum())
+        
+        cols = [('Offense',   '1stD'),
+                ('Offense',  'TotYd'),
+                ('Offense',  'PassY'),
+                ('Offense',  'RushY'),
+                ('Offense',     'TO'),
+                ('Defense',   '1stD'),
+                ('Defense',  'TotYd'),
+                ('Defense',  'PassY'),
+                ('Defense',  'RushY'),
+                ('Defense',     'TO'),
+                ('Meta',      'Home'),
+                ('Meta','Win'),
+                ('Meta','Loss'),
+                ('Meta','Tie')]
+        if only_data_columns:
+            return df[cols]
+        
+        return df
     
     def load_all_teams_stats(self, year):
         pass

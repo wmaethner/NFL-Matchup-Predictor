@@ -10,6 +10,8 @@ import os
 import requests
 import pickle
 
+import pandas as pd
+
 from pathlib import Path  
 from time import perf_counter
 from bs4 import BeautifulSoup as Soup
@@ -99,6 +101,14 @@ def load_obj(filename, path = CACHE_PATH):
     with open(f'{path}/{filename}', 'rb') as p:
         return pickle.load(p)
 
+def save_df(filename, df, path = CACHE_PATH):
+    if not os.path.exists(path):
+        os.makedirs(path)
+        
+    df.to_pickle(f'{path}/{filename}.pkl')
+
+def load_df(filename, path = CACHE_PATH):
+    return pd.read_pickle(f'{path}/{filename}.pkl')
 
 
 # Display Helpers

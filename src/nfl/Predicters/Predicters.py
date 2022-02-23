@@ -20,14 +20,14 @@ def get_all_stats(year):
     # printProgressBar(0, len(tm.teams), prefix = 'Progress:', suffix = 'Complete', length = 50)
     for index, t in enumerate(tm.teams):
         # printProgressBar(index + 1, len(tm.teams), prefix = 'Progress:', suffix = 'Complete', length = 50)
-        data[t.id_num] = tm.get_teams_stats(t.id_num, year, 1)
+        data[t.id_num] = tm.get_teams_season_stats(t.id_num, year)
     return data
 
 def concat_year_stats(yearly_stats, row_index):
     all_stats = pd.DataFrame()
     for stats in yearly_stats:
         all_stats = pd.concat((all_stats, 
-                               pd.concat({key: x.iloc[[row_index]] for key, x in stats.items()}, axis=0)))
+                               pd.concat({key: x.loc[[row_index]] for key, x in stats.items()}, axis=0)))
     return all_stats.reset_index(level=1, drop=True)
 
 def get_mean_stats(years, row_index):
@@ -40,13 +40,14 @@ def get_mean_stats(years, row_index):
 
 def get_correlation_normalized_stats(averaged_stats):
     stats_normal = (averaged_stats-averaged_stats.min())/(averaged_stats.max()-averaged_stats.min())
-    stats_normal = stats_normal.fillna(0)
-    corr = averaged_stats.corr() 
+    stats_normal.fillna(0, inplace=True)
+    corr = stats_normal.corr()
+    print(corr)
     win_corr = corr.iloc[0,3:]
     return (win_corr, stats_normal)
 
 def normalized_stats(year, offense = True):
-    stats = get_mean_stats([year], 0 if offense else 1)
+    stats = get_mean_stats([year], 'Offense' if offense else 'Defense')
     normal = (stats-stats.min())/(stats.max()-stats.min())
     return normal.fillna(0)
 
@@ -67,8 +68,8 @@ class YearsNormalStats:
 
 class Correlations:
     def __init__(self, years):
-        df_means_off = get_mean_stats(years, 0)
-        df_means_def = get_mean_stats(years, 1)
+        df_means_off = get_mean_stats(years, 'Offense')
+        df_means_def = get_mean_stats(years, 'Defense')
 
         offense_corr, offense_normal = get_correlation_normalized_stats(df_means_off)
         defense_corr, defense_normal = get_correlation_normalized_stats(df_means_def)
@@ -94,6 +95,9 @@ class Offense_Correlation(PredicterBase):
         self.correlations = Correlations(years)     
     
     def predict_winner(self, home, away, year):
+        if year not in self.normalized_stats.keys():
+            self.normalized_stats[year] = YearsNormalStats(year)
+            
         offense_normal, defense_normal = self.normalized_stats[year].get_normals()
         offense_corr, defense_corr = self.correlations.get_corrs()
         
@@ -107,7 +111,8 @@ class Offense_Correlation(PredicterBase):
                 away_score += defense_corr[key] * defense_normal.loc[away, key]              
             
         return get_winner_percentages(home, home_score, away, away_score)
-       
+        
+ 
 class TensorFlowBasic(PredicterBase):
     def __init__(self, years, include_defense):
         PredicterBase.__init__(self, years, include_defense)
@@ -135,7 +140,7 @@ class TensorFlowBasic(PredicterBase):
                     data.append(defense_normal[away].tolist())
                 
                 train_data.append(data)
-                train_results.append(winner)        
+                train_results.append(winner)    
     
         self.model = tf.keras.models.Sequential([
             tf.keras.layers.Flatten(),
@@ -152,8 +157,12 @@ class TensorFlowBasic(PredicterBase):
         self.probability_model = tf.keras.Sequential([self.model, tf.keras.layers.Softmax()])
         
     def predict_winner(self, home, away, year):     
+        if year not in self.normalized_stats.keys():
+            self.normalized_stats[year] = YearsNormalStats(year)
+            
         offense_normal, defense_normal = self.normalized_stats[year].get_normals_as_numpy()
         data = [offense_normal[home].tolist(), offense_normal[away].tolist()]     
+        
         if self.include_defense:
             data.insert(1, defense_normal[home].tolist())
             data.append(defense_normal[away].tolist())
@@ -161,7 +170,7 @@ class TensorFlowBasic(PredicterBase):
         data_exp = (np.expand_dims(data,0))
         
         result = self.probability_model.predict(data_exp)
-     
+        
         return home if np.argmax(result) == 1 else away, np.max(result)
     
     
