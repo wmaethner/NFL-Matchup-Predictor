@@ -18,13 +18,16 @@ import matplotlib.pyplot as plt
 from nfl.Data.DataScraper import Data_Scraper
 from nfl.Data.TeamManager import Team_Manager
 
-from nfl.Predicters.Predicters import (Offense_Correlation,  
+from nfl.Predicters.Predicters import (Offense_Correlation,
+                                       Weekly_Correlation,
                                        TensorFlowBasic)
 from nfl.Predicters.Analyzer import analyze_predicter
 
 
+from nfl.Performance.Performance import (start_metric, stop_metric, display_metrics)
+
 from utilities import (PFR_BASE_URL, start_timer, stop_timer, parse_page, 
-                       get_table_by_id, parse_table, parse_page)
+                       get_table_by_id, parse_table, parse_page, printProgressBar)
 
 
 def explore(obj):
@@ -92,6 +95,10 @@ def analyze_predicters(train_years, test_years):
     both = Offense_Correlation(train_years, True)
     data.append(stop_timer(s))
     
+    s = start_timer('Build WeekCorr')
+    week = Weekly_Correlation(train_years, True)
+    data.append(stop_timer(s))
+    
     s = start_timer('Build Tensor')
     tfb = TensorFlowBasic(train_years, False)
     data.append(stop_timer(s))
@@ -108,6 +115,10 @@ def analyze_predicters(train_years, test_years):
     analyze_predicter(both, test_years)
     data.append(stop_timer(s))
     
+    s = start_timer('Predict WeekCorr')
+    analyze_predicter(week, test_years)
+    data.append(stop_timer(s))
+    
     s = start_timer('Predict Tensor')
     analyze_predicter(tfb, test_years)
     data.append(stop_timer(s))
@@ -120,27 +131,92 @@ def analyze_predicters(train_years, test_years):
         print(f'{x["label"]}: {x["elapsed"]}')
       
 
+def get_all_stats(year):
+    tm = Team_Manager()
+    data = {}
+    # printProgressBar(0, len(tm.teams), prefix = 'Progress:', suffix = 'Complete', length = 50)
+    # for index, t in enumerate(tm.teams):
+    #     # printProgressBar(index + 1, len(tm.teams), prefix = 'Progress:', suffix = 'Complete', length = 50)
+    #     data[t.id_num] = tm.get_teams_season_stats(t.id_num, year)
+        
+    data[0] = tm.get_teams_season_stats(0, year)
+    return data
+
+def concat_year_stats(yearly_stats, row_index):
+    all_stats = pd.DataFrame()
+    for stats in yearly_stats:
+        all_stats = pd.concat((all_stats, 
+                               pd.concat({key: x.loc[[row_index]] for key, x in stats.items()}, axis=0)))
+    return all_stats.reset_index(level=1, drop=True)
+
+def get_mean_stats(years, row_index):
+    year_stats = []
+    for year in years:
+        year_stats.append(get_all_stats(year))
+    all_stats = concat_year_stats(year_stats, row_index)
+    by_row_index = all_stats.groupby(all_stats.index)
+    return by_row_index.mean()
+
+
 def main():
     # pd.set_option('display.max_columns', None)
     
-    off = Offense_Correlation([2021], False)
-   
     
-    ds = Data_Scraper()
-    tm = Team_Manager()
+    # ds = Data_Scraper()
+    # tm = Team_Manager()
+    
+    
+    # year_right = 0
+    # schedule = ds.get_schedule(2021)
+    
+    # print(schedule)
+    # print(len(schedule))
+    
+    
+    # printProgressBar(0, len(schedule), prefix = 'Schedule Progress:', suffix = 'Complete', length = 50)
+    # for index, row in schedule.iterrows():
+    #     print(f'{schedule.loc[index,"Home"]} - {schedule.loc[index,"Away"]}')
+        # printProgressBar(index+1, len(schedule), prefix = 'Schedule Progress:', suffix = 'Complete', length = 50)                    
+
+    # for i in range(len(schedule)):
+    #     row = schedule.iloc[i,:]
+    #     print(f'{row["Home"]} - {row["Away"]}')
+        # print(f'{schedule.iloc[i,"Home"]} - {schedule.iloc[i,"Away"]}')
+
+   
+    # print(tm.get_teams_stats_by_week(0, 2021, 2, only_data_columns=True))
+    
+    # data = tm.get_teams_stats_by_week(0, 2021, 2, average_results=True)
+    # print(data)
+    # print(data[('Offense','1stD')])
+    
+    # years = [2020,2021]
+    # week = Weekly_Correlation(years, True)
+    # # off = Offense_Correlation(years, True)
+    # # prediction = off.predict_winner(0, 1, 2021)
+    # # print(prediction)
+    # prediction = week.predict_winner(0, 1, 2021, '2')
+    # print(prediction)
+
+    # return
+    
+    # stats = []
+    # for year in years:
+    #     stats.append(get_all_stats(year))
+    # # print(len(stats))
+    # all_stats = concat_year_stats(stats, 'Offense')
+    # row_index = all_stats.groupby(all_stats.index)
+    # print(row_index.mean())
+    
     
     # data = tm.get_teams_season_stats(0, 2021)
-    # print(data)
-    data = tm.get_teams_stats_by_week(0, 2021, all_weeks=True, sum_results=False, only_data_columns=True)
-    # data = tm.get_teams_stats_by_week(0, 2021, all_weeks=True, sum_results=True, only_data_columns=False)
-    # print(data.columns)
-    # print(data[[('Offense'),('Defense'),('Meta','Home'),('Meta','Win'),('Meta','Loss'),('Meta','Tie')]])
-    stats_normal = (data-data.min())/(data.max()-data.min())
-    stats_normal.fillna(0, inplace=True)
-    corr = stats_normal.corr() 
-    print(stats_normal)
-    print(corr)
-    print(corr[('Meta','Win')])
+    # data = tm.get_teams_stats_by_week(0, 2021, all_weeks=True, sum_results=False, only_data_columns=True)
+    # stats_normal = (data-data.min())/(data.max()-data.min())
+    # stats_normal.fillna(0, inplace=True)
+    # corr = stats_normal.corr() 
+    # print(stats_normal)
+    # print(corr)
+    # print(corr[('Meta','Win')])
     
     # data = tm.get_teams_stats_by_week(0, 2021, 15, all_weeks=True, sum_results=True)
     # print(data)
@@ -226,33 +302,27 @@ def main():
 
     # test_df = pd.DataFrame(test, columns=list(range(10)))
 
-
-    # s = start_timer('save df')    
-    # test_df.to_pickle('testdf.pkl')
-    # stop_timer(s, True)    
-
-    # s = start_timer('load dict')
-    # with open(f'testdict.pkl', 'rb') as p:
-    #     test = pickle.load(p)
-    # stop_timer(s, True)    
-
-    # s = start_timer('load df')
-    # test_df = pd.read_pickle("testdf.pkl")    
-    # stop_timer(s, True)  
-    
-
-    
-    
-    
-    
-    
-    
+   
     # ds.get_teams_weekly_stats('crd', 2021)
     
     # data = []
-    # train_years = [2017,2018,2019,2020]
-    # test_years = [2021]
+    train_years = [2017,2018,2019,2020]
+    test_years = [2021]
     # analyze_predicters(train_years, test_years)
+    
+    start_metric('Analyze Weekly Correlation')
+    # pred = Offense_Correlation(train_years, False)
+    pred = Weekly_Correlation(train_years, False)
+    data = analyze_predicter(pred, test_years, True)
+    stop_metric()
+    # # print(data)
+    # week_df = pd.DataFrame(data['by_year_and_week'][test_years[0]]).T
+    # week_df.loc[:, 'percent'] = week_df.apply(lambda row: 100*(row['right']/row['total']), axis=1)
+    # # print(week_df.iloc[:18])
+    # week_df.iloc[:18].loc[:,'percent'].plot()
+    
+    # xpoints = [x for x in data['by_year_and_week'][2021].keys()]
+    # print(xpoints)
     
     
     # s = start_timer('Build Tensor')
@@ -263,54 +333,7 @@ def main():
     # tfb_both = TensorFlowBasic(train_years, True)
     # data.append(stop_timer(s))
     
-    return
-
-
-
-    # train_years = [2017]
-    # test_years = [2017]
-    # for i in range(5):
-    #     tfb = TensorFlowBasic(train_years)
-    #     tfbs = TensorFlowBothStats(train_years)
-    #     analyze_predicter(tfb, test_years)
-    #     analyze_predicter(tfbs, test_years)
-    #     print('========================')
-    # return
-    
-    # print(tfb.train_data)
-    # print(len(tfb.train_results))
-    tfb = TensorFlowBasic([2017])
-    total = 0
-    total_right = 0
-    schedule = ds.get_schedule(2021)
-    for index, row in schedule.iterrows():
-        home = tm.get_team_id(row['Home'])
-        away = tm.get_team_id(row['Away'])
-        results = tfb.predict_winner(home, away, 2021)
-        predicted = np.argmax(results)
-        actual = 1 if tm.get_team_id(row["Winner/tie"]) == home else 0
-        
-        total += 1
-        total_right += 1 if predicted == actual else 0
-        
-        # print(f'{row["Home"]} vs {row["Away"]}: Predicted: {predicted} Actual: {actual}')   
-    print(f'{total_right}/{total}={total_right/total}')
-    
-    return
-    
-    results = tfb.predict_winner(3,4)
-    print(results)
-    print(results[0][0])
-    print('{}: {:2.0f}% vs {}: {:2.0f}%'.format(tm.get_team(3).name,
-                                                100*results[0][0],
-                                                tm.get_team(4).name,
-                                                100*results[0][1]))
-    # print(results)
-    # predictions = model(x_train[:1]).numpy()
-    return
-    
-    ds = Data_Scraper()
-    print(ds.get_schedule(2021))
+    display_metrics()
     return
    
     
