@@ -10,7 +10,7 @@ import pandas as pd
 
 from nfl.Core.utilities import (PFR_BASE_URL, parse_page, get_table_by_id, 
                                 parse_table,save_obj, load_obj, file_exists,
-                                save_df, load_df)
+                                save_df, load_df, pickle_file_exists)
 
 base_url = "https://www.pro-football-reference.com"
 teams = []
@@ -23,7 +23,8 @@ class Data_Scraper:
         self.season_stats = load_df('season_stats') if file_exists('season_stats.pkl') else pd.DataFrame()
         self.season_stats_by_week = load_df('season_stats_by_week') if file_exists('season_stats_by_week.pkl') else pd.DataFrame()
         self.schedule = load_df('schedule') if file_exists('schedule.pkl') else pd.DataFrame()
-
+        self.season_stats_meta = load_obj('season_stats_meta') if pickle_file_exists('season_stats_meta') else {}
+        self.season_stats_by_week = self.season_stats_by_week.sort_index()
     
     def data_columns(self):
         return ['Wins','Losses','Ties','PF','Yds','Ply','Y/P','TO','FL','1stD',
@@ -100,18 +101,22 @@ class Data_Scraper:
     def get_teams_season_stats_by_week(self, team_key, year, week):
         if team_key in self.season_stats_by_week.index.unique(0).array:
             if not year in self.season_stats_by_week.loc[team_key].index.unique(0).array:
+                print('loading year')
                 df_year = self.get_teams_weekly_stats(team_key, year)
                 df_indexed = pd.concat({year: df_year})
                 self.season_stats_by_week = pd.concat([self.season_stats_by_week, pd.concat({team_key: df_indexed})])
-                save_df('season_stats_by_week', self.season_stats_by_week)
+                self.season_stats_by_week = self.season_stats_by_week.sort_index()
+                save_df('season_stats_by_week', self.season_stats_by_week)             
         else:
+            print('loading team')
             df_year = self.get_teams_weekly_stats(team_key, year)
             df_indexed = pd.concat({year: df_year})
             self.season_stats_by_week = pd.concat([self.season_stats_by_week, pd.concat({team_key: df_indexed})])
+            self.season_stats_by_week = self.season_stats_by_week.sort_index()
             save_df('season_stats_by_week', self.season_stats_by_week)
         
-        self.season_stats_by_week = self.season_stats_by_week.sort_index()
-        return self.season_stats_by_week.loc[(team_key, year)]  
+        # self.season_stats_by_week = self.season_stats_by_week.sort_index()
+        return self.season_stats_by_week.loc[(team_key, year)].copy()
 
     def get_teams_weekly_stats(self, team_key, year):
         url = PFR_BASE_URL + f"/teams/{team_key}/{year}.htm"
@@ -133,7 +138,9 @@ class Data_Scraper:
         df.drop(df[df[('Meta','Opp')] == 'Bye Week'].index, inplace = True)
         
         # Drop playoffs
-        playoff_idx = min(df[df[('Meta','Date')] == 'Playoffs'].index.array)
+        arr = df[df[('Meta','Date')] == 'Playoffs'].index.array
+        playoff_idx = min(arr) if arr else len(df.index) + 1
+        # playoff_idx = min(df[df[('Meta','Date')] == 'Playoffs'].index.array)
         df.drop([x for x in df.index.array if x >= playoff_idx], inplace=True)
         
         # Set Home and Won columns

@@ -13,6 +13,7 @@ from nfl.Core.utilities import (PFR_BASE_URL, parse_page, get_table_by_id,
                                 file_exists, start_timer, stop_timer, 
                                 printProgressBar)
 from nfl.Data.DataScraper import Data_Scraper
+from nfl.Performance.Performance import (start_metric, stop_metric)
 
 class Team:
     def __init__(self, team_tag):
@@ -38,6 +39,7 @@ class Team_Manager:
         self.teams = []
         self.data_scraper = Data_Scraper()
         self.load_teams()
+        self.cache = {}
 
         
     def load_teams(self):
@@ -90,35 +92,63 @@ class Team_Manager:
                                 week = 0, 
                                 all_weeks = False, 
                                 sum_results = False,
-                                only_data_columns = False):
-        df = self.data_scraper.get_teams_weekly_stats(self.get_team(team_id).abbr, year)
-        # arr = df[df[('Meta','Week')] == week].index.array
-        # print(arr)
-        # week_index = min(arr) if arr else len(df.index)
-        # print(week_index)
+                                only_data_columns = False,
+                                average_results = False):
+        
+        if team_id in self.cache.keys():
+            if year in self.cache[team_id].keys():
+                if week in self.cache[team_id][year].keys():
+                    df = self.cache[team_id][year][week]
+                elif all_weeks and ('all' in self.cache[team_id][year].keys()):
+                    df = self.cache[team_id][year]['all']
+        else:
+            start_metric('Get team stats from scraper')
+            df = self.data_scraper.get_teams_season_stats_by_week(self.get_team(team_id).abbr, year, week)
+            stop_metric()
+
+            if not all_weeks:
+                df.drop(df[df[('Meta','Week')].astype(int) > week].index, inplace = True)
+            
+            if not team_id in self.cache.keys():
+                self.cache[team_id] = {}
+            if not year in self.cache[team_id].keys():
+                self.cache[team_id][year] = {}
+            
+            self.cache[team_id][year]['all' if all_weeks else week] = df.copy()
+            
+        # start_metric('Get team stats from scraper')
+        # df = self.data_scraper.get_teams_season_stats_by_week(self.get_team(team_id).abbr, year, week)
+        # stop_metric()
+
         if not all_weeks:
             df.drop(df[df[('Meta','Week')].astype(int) > week].index, inplace = True)
-        # df.drop([x for x in df.index.array if x > week_index], inplace=True)
+        
         
         if sum_results:
             df.loc['Total'] = pd.Series(df.sum())
         
-        cols = [('Offense',   '1stD'),
-                ('Offense',  'TotYd'),
-                ('Offense',  'PassY'),
-                ('Offense',  'RushY'),
-                ('Offense',     'TO'),
-                ('Defense',   '1stD'),
-                ('Defense',  'TotYd'),
-                ('Defense',  'PassY'),
-                ('Defense',  'RushY'),
-                ('Defense',     'TO'),
-                ('Meta',      'Home'),
-                ('Meta','Win'),
-                ('Meta','Loss'),
-                ('Meta','Tie')]
+        data_cols = [('Offense',   '1stD'),
+                     ('Offense',  'TotYd'),
+                     ('Offense',  'PassY'),
+                     ('Offense',  'RushY'),
+                     ('Offense',     'TO'),
+                     ('Defense',   '1stD'),
+                     ('Defense',  'TotYd'),
+                     ('Defense',  'PassY'),
+                     ('Defense',  'RushY'),
+                     ('Defense',     'TO')]
+        meta_cols = [('Meta','Home'),
+                     ('Meta','Win'),
+                     ('Meta','Loss'),
+                     ('Meta','Tie')]
         if only_data_columns:
-            return df[cols]
+            return df[data_cols+meta_cols]
+        
+        if average_results:
+            start_metric('Average results')
+            data = df[data_cols]
+            df = data.mean().T
+            stop_metric()
         
         return df
     

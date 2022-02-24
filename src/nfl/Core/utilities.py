@@ -85,6 +85,9 @@ def path_exists(path):
     """
     return os.path.exists(path)
 
+def pickle_file_exists(filename, path = CACHE_PATH):
+    return file_exists(f'{filename}.pkl')
+
 def file_exists(filename, path = CACHE_PATH):
     filepath = Path(f'{path}/{filename}')  
     return filepath.exists()
